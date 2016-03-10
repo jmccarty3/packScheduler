@@ -2,6 +2,9 @@ package: github.com/jmccarty3/packScheduler
 import:
 - package: github.com/docker/docker
   version: 1.9.0
+  subpackage:
+    - .
+    - units
 - package: k8s.io/kubernetes
   version: 1.1.7
   subpackage:
