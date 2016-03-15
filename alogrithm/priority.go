@@ -100,7 +100,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 	cpuScore := calculateScore(totalMilliCPU, capacityMilliCPU, node.Name)
 	memoryScore := calculateScore(totalMemory, capacityMemory, node.Name)
 	glog.V(10).Infof(
-		"%v -> %v: Least Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
+		"%v -> %v: Most Requested Priority, Absolute/Requested: (%d, %d) / (%d, %d) Score: (%d, %d)",
 		pod.Name, node.Name,
 		totalMilliCPU, totalMemory,
 		capacityMilliCPU, capacityMemory,
