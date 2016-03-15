@@ -1,6 +1,8 @@
 package algorithm
 
 import (
+	"math"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/api/resource"
@@ -40,8 +42,9 @@ func calculateScore(requested int64, capacity int64, node string) int {
 			requested, capacity, node)
 		return 0
 	}
+
 	// Inverse of normal
-	return 11 - int(((capacity-requested)*10)/capacity)
+	return 11 - int(math.Ceil(float64((capacity-requested)*10)/float64(capacity)))
 }
 
 // For each of these resources, a pod that doesn't request the resource explicitly
