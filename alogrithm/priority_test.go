@@ -21,7 +21,53 @@ func makeNode(node string, milliCPU, memory int64) api.Node {
 	}
 }
 
-func TestLeastRequested(t *testing.T) {
+func makeResourceRequirements(rc, rm, lc, lm int64) api.ResourceRequirements {
+	return api.ResourceRequirements{
+		Requests: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(rc, resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(rm, resource.BinarySI),
+		},
+		Limits: api.ResourceList{
+			api.ResourceCPU:    *resource.NewMilliQuantity(lc, resource.DecimalSI),
+			api.ResourceMemory: *resource.NewQuantity(lm, resource.BinarySI),
+		},
+	}
+}
+
+func TestGetResourcesForPacking(t *testing.T) {
+	cpu := int64(1000)
+	memory := int64(2000)
+
+	tests := []struct {
+		test      string
+		resources api.ResourceRequirements
+	}{
+		{
+			test:      "RequestOnly",
+			resources: makeResourceRequirements(cpu, memory, 0, 0),
+		},
+		{
+			test:      "LimitOnly",
+			resources: makeResourceRequirements(0, 0, cpu, memory),
+		},
+		{
+			test:      "ReqCpuLimitMem",
+			resources: makeResourceRequirements(cpu, 0, 0, memory),
+		},
+		{
+			test:      "ReqMemLimitCpu",
+			resources: makeResourceRequirements(0, memory, cpu, memory),
+		},
+	}
+
+	for _, test := range tests {
+		if ac, am := getResourcesForPacking(&test.resources); ac != cpu || am != memory {
+			t.Errorf("Test: %s  Expected: (%d, %d)  Actual: (%d, %d)", test.test, cpu, memory, ac, am)
+		}
+	}
+}
+
+func TestMostRequested(t *testing.T) {
 	labels1 := map[string]string{
 		"foo": "bar",
 		"baz": "blah",
@@ -48,12 +94,20 @@ func TestLeastRequested(t *testing.T) {
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("0"),
 					},
+					Limits: api.ResourceList{
+						"cpu":    resource.MustParse("0"),
+						"memory": resource.MustParse("0"),
+					},
 				},
 			},
 			{
 				Resources: api.ResourceRequirements{
 					Requests: api.ResourceList{
 						"cpu":    resource.MustParse("2000m"),
+						"memory": resource.MustParse("0"),
+					},
+					Limits: api.ResourceList{
+						"cpu":    resource.MustParse("0"),
 						"memory": resource.MustParse("0"),
 					},
 				},
@@ -71,6 +125,10 @@ func TestLeastRequested(t *testing.T) {
 						"cpu":    resource.MustParse("1000m"),
 						"memory": resource.MustParse("2000"),
 					},
+					Limits: api.ResourceList{
+						"cpu":    resource.MustParse("0"),
+						"memory": resource.MustParse("0"),
+					},
 				},
 			},
 			{
@@ -78,6 +136,10 @@ func TestLeastRequested(t *testing.T) {
 					Requests: api.ResourceList{
 						"cpu":    resource.MustParse("2000m"),
 						"memory": resource.MustParse("3000"),
+					},
+					Limits: api.ResourceList{
+						"cpu":    resource.MustParse("0"),
+						"memory": resource.MustParse("0"),
 					},
 				},
 			},

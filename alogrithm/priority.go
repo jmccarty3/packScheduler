@@ -77,6 +77,15 @@ func getNonzeroRequests(requests *api.ResourceList) (int64, int64) {
 	return millicpu, memory
 }
 
+func getResourcesForPacking(resources *api.ResourceRequirements) (int64, int64) {
+	rc, rm := getNonzeroRequests(&resources.Requests)
+	lc, lm := getNonzeroRequests(&resources.Limits)
+
+	glog.V(10).Infof("Requests: (%d, %d)  Limits: (%d, %d)", rc, rm, lc, lm)
+
+	return int64(math.Max(float64(rc), float64(lc))), int64(math.Max(float64(rm), float64(lm)))
+}
+
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
 func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
@@ -87,7 +96,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 
 	for _, existingPod := range pods {
 		for _, container := range existingPod.Spec.Containers {
-			cpu, memory := getNonzeroRequests(&container.Resources.Requests)
+			cpu, memory := getResourcesForPacking(&container.Resources)
 			totalMilliCPU += cpu
 			totalMemory += memory
 		}
@@ -95,7 +104,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 	// Add the resources requested by the current pod being scheduled.
 	// This also helps differentiate between differently sized, but empty, nodes.
 	for _, container := range pod.Spec.Containers {
-		cpu, memory := getNonzeroRequests(&container.Resources.Requests)
+		cpu, memory := getResourcesForPacking(&container.Resources)
 		totalMilliCPU += cpu
 		totalMemory += memory
 	}
