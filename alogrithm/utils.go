@@ -16,8 +16,8 @@ import (
 // consuming no resources whatsoever. We chose these values to be similar to the
 // resources that we give to cluster addon pods (#10653). But they are pretty arbitrary.
 // As described in #11713, we use request instead of limit to deal with resource requirements.
-const defaultMilliCPURequest int64 = 100             // 0.1 core
-const defaultMemoryRequest int64 = 200 * 1024 * 1024 // 200 MB
+const defaultMilliCPURequest int64 = 250             // 0.25 core
+const defaultMemoryRequest int64 = 500 * 1024 * 1024 // 500 MB
 
 // TODO: Consider setting default as a fixed fraction of machine capacity (take "capacity api.ResourceList"
 // as an additional argument here) rather than using constants
