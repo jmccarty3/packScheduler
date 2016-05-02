@@ -3,7 +3,7 @@ package main
 import (
 	"runtime"
 
-	_ "github.com/jmccarty3/packScheduler/alogrithm"
+	_ "github.com/jmccarty3/packScheduler/algorithm"
 
 	"k8s.io/kubernetes/pkg/healthz"
 	"k8s.io/kubernetes/pkg/util"
