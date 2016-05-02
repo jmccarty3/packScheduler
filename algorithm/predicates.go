@@ -15,12 +15,56 @@ func init() {
 			return NewPodOverCommitPredicate(args.NodeInfo)
 		},
 	)
+
+	factory.RegisterFitPredicateFactory(
+		"NodeOutOfDisk",
+		func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
+			return NewNodeOutOfDiskPredicate(args.NodeInfo)
+		},
+	)
 }
 
+//ResourceOverCommit used to determine if scheduling pods would over commit a node
 type ResourceOverCommit struct {
 	info pluginPred.NodeInfo
 }
 
+//NodeDisk used to determine if a node is reporting out of disk
+type NodeDisk struct {
+	info pluginPred.NodeInfo
+}
+
+//NewNodeOutOfDiskPredicate crestes a new NodeOutOfDisk Predicate
+func NewNodeOutOfDiskPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate {
+	disk := &NodeDisk{
+		info: info,
+	}
+
+	return disk.NodeOutOfDisk
+}
+
+//NodeOutOfDisk determine if a node is reporting out of disk.
+func (d *NodeDisk) NodeOutOfDisk(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+	info, err := d.info.GetNodeInfo(node)
+
+	if err != nil {
+		return false, err
+	}
+
+	for _, c := range info.Status.Conditions {
+		if c.Type != api.NodeOutOfDisk {
+			continue
+		}
+
+		if c.Status == api.ConditionTrue {
+			return false, nil
+		}
+	}
+
+	return true, nil
+}
+
+//NewPodOverCommitPredicate creates a new PodOverCommit predicate
 func NewPodOverCommitPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate {
 	commit := &ResourceOverCommit{
 		info: info,
@@ -29,6 +73,7 @@ func NewPodOverCommitPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate 
 	return commit.PodOverCommitNode
 }
 
+//PodOverCommitNode determines if pod resource request/limits would cause overcommit for a node
 func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
 	info, err := r.info.GetNodeInfo(node)
 

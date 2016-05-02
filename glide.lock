@@ -1,8 +1,10 @@
-hash: 28c2b2dcc9c147088c6107eef90a8111f93b5de619f5cb85b294b840aaad2945
-updated: 2016-03-10T18:45:23.304527688-05:00
+hash: ccddc88a51adb6df2fba61db54eb462ab179ee83f21e8f95bb469661d1d29d69
+updated: 2016-03-31T10:27:29.776003133-04:00
 imports:
 - name: github.com/docker/docker
   version: 76d6bc9a9f1690e16f3721ba165364688b626de2
+- name: github.com/docker/libcontainer
+  version: 83a102cc68a09d890cce3b6c2e5c14c49e6373a0
 - name: k8s.io/kubernetes
   version: e4e6878293a339e4087dae684647c9e53f1cf9f0
 devImports: []

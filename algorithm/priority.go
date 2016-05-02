@@ -14,12 +14,17 @@ func init() {
 	factory.RegisterPriorityFunction("MostUsed", MostRequestedPriority, 1)
 }
 
+//MostRequestedPriority determines the priority of nodes so that the highest utilization is chosen first
 func MostRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
 		return algorithm.HostPriorityList{}, err
 	}
 	podsToMachines, err := predicates.MapPodsToMachines(podLister)
+
+	if err != nil {
+		return algorithm.HostPriorityList{}, err
+	}
 
 	list := algorithm.HostPriorityList{}
 	for _, node := range nodes.Items {
