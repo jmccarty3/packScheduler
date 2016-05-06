@@ -1,11 +1,14 @@
 package algorithm
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	pluginPred "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func init() {
@@ -34,6 +37,21 @@ type NodeDisk struct {
 	info pluginPred.NodeInfo
 }
 
+//OverCommitError records what resource a node would be overcommited on
+type OverCommitError struct {
+	name string
+}
+
+func (e *OverCommitError) Error() string {
+	return fmt.Sprintf("Nodee would be overcommited on %s", e.name)
+}
+
+func newOverCommitError(name string) *OverCommitError {
+	return &OverCommitError{
+		name: name,
+	}
+}
+
 //NewNodeOutOfDiskPredicate crestes a new NodeOutOfDisk Predicate
 func NewNodeOutOfDiskPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate {
 	disk := &NodeDisk{
@@ -44,7 +62,7 @@ func NewNodeOutOfDiskPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate 
 }
 
 //NodeOutOfDisk determine if a node is reporting out of disk.
-func (d *NodeDisk) NodeOutOfDisk(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func (d *NodeDisk) NodeOutOfDisk(pod *api.Pod, node string, cacheInfo *schedulercache.NodeInfo) (bool, error) {
 	info, err := d.info.GetNodeInfo(node)
 
 	if err != nil {
@@ -74,20 +92,19 @@ func NewPodOverCommitPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate 
 }
 
 //PodOverCommitNode determines if pod resource request/limits would cause overcommit for a node
-func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, existingPods []*api.Pod, node string) (bool, error) {
+func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, node string, cacheInfo *schedulercache.NodeInfo) (bool, error) {
 	info, err := r.info.GetNodeInfo(node)
 
 	if err != nil {
 		return false, err
 	}
 
-	pods := append(existingPods, pod)
+	pods := append(cacheInfo.Pods(), pod)
 	totalCPU := int64(0)
 	totalMem := int64(0)
 
 	if int64(len(pods)) > info.Status.Capacity.Pods().Value() {
 		glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would exceed Pod capacity", pod.Name, info.Name)
-		pluginPred.FailedResourceType = "PodExceedsMaxPodNumber"
 		return false, nil
 	}
 
@@ -98,13 +115,11 @@ func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, existingPods []*api
 
 		if totalCPU > info.Status.Capacity.Cpu().MilliValue() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on CPU", pod.Name, info.Name)
-			pluginPred.FailedResourceType = "PodOverCommitsCPU"
-			return false, nil
+			return false, newOverCommitError("CPU")
 		}
 		if totalMem > info.Status.Capacity.Memory().Value() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on Memory", pod.Name, info.Name)
-			pluginPred.FailedResourceType = "PodOverCommitsMemory"
-			return false, nil
+			return false, newOverCommitError("Memory")
 		}
 	}
 

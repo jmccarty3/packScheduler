@@ -6,8 +6,9 @@ import (
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
-	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	schedulerapi "k8s.io/kubernetes/plugin/pkg/scheduler/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 func init() {
@@ -15,20 +16,15 @@ func init() {
 }
 
 //MostRequestedPriority determines the priority of nodes so that the highest utilization is chosen first
-func MostRequestedPriority(pod *api.Pod, podLister algorithm.PodLister, nodeLister algorithm.NodeLister) (algorithm.HostPriorityList, error) {
+func MostRequestedPriority(pod *api.Pod, nodeNameToInfo map[string]*schedulercache.NodeInfo, nodeLister algorithm.NodeLister) (schedulerapi.HostPriorityList, error) {
 	nodes, err := nodeLister.List()
 	if err != nil {
-		return algorithm.HostPriorityList{}, err
-	}
-	podsToMachines, err := predicates.MapPodsToMachines(podLister)
-
-	if err != nil {
-		return algorithm.HostPriorityList{}, err
+		return schedulerapi.HostPriorityList{}, err
 	}
 
-	list := algorithm.HostPriorityList{}
+	list := schedulerapi.HostPriorityList{}
 	for _, node := range nodes.Items {
-		list = append(list, calculateResourceOccupancy(pod, node, podsToMachines[node.Name]))
+		list = append(list, calculateResourceOccupancy(pod, node, nodeNameToInfo[node.Name].Pods()))
 	}
 	return list, nil
 }
@@ -53,7 +49,7 @@ func calculateScore(requested int64, capacity int64, node string) int {
 
 // Calculate the resource occupancy on a node.  'node' has information about the resources on the node.
 // 'pods' is a list of pods currently scheduled on the node.
-func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) algorithm.HostPriority {
+func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) schedulerapi.HostPriority {
 	totalMilliCPU := int64(0)
 	totalMemory := int64(0)
 	capacityMilliCPU := node.Status.Capacity.Cpu().MilliValue()
@@ -87,7 +83,7 @@ func calculateResourceOccupancy(pod *api.Pod, node api.Node, pods []*api.Pod) al
 		score = int((cpuScore + memoryScore) / 2)
 	}
 
-	return algorithm.HostPriority{
+	return schedulerapi.HostPriority{
 		Host:  node.Name,
 		Score: score,
 	}

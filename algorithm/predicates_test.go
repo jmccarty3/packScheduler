@@ -6,6 +6,7 @@ import (
 
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
+	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
 const (
@@ -70,7 +71,7 @@ func TestNodeDisk(t *testing.T) {
 	pred := NewNodeOutOfDiskPredicate(newTestNodeInfo())
 
 	for _, test := range tests {
-		actual, err := pred(&api.Pod{}, []*api.Pod{}, test.name)
+		actual, err := pred(&api.Pod{}, test.name, schedulercache.NewNodeInfo())
 		if err != nil {
 			t.Error("Error from predicate: ", err)
 		}
