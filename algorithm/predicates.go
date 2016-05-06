@@ -43,7 +43,7 @@ type OverCommitError struct {
 }
 
 func (e *OverCommitError) Error() string {
-	return fmt.Sprintf("Nodee would be overcommited on %s", e.name)
+	return fmt.Sprintf("Node would be overcommited on %s", e.name)
 }
 
 func newOverCommitError(name string) *OverCommitError {
@@ -115,11 +115,11 @@ func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, node string, cacheI
 
 		if totalCPU > info.Status.Capacity.Cpu().MilliValue() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on CPU", pod.Name, info.Name)
-			return false, newOverCommitError("CPU")
+			return false, nil //TODO return newOverCommitError("CPU") when InsufficentResources can be modified
 		}
 		if totalMem > info.Status.Capacity.Memory().Value() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on Memory", pod.Name, info.Name)
-			return false, newOverCommitError("Memory")
+			return false, nil //TODO return newOverCommitError("Memory") when InsufficentResources can be modified
 		}
 	}
 
