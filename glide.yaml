@@ -1,5 +1,7 @@
 package: github.com/jmccarty3/packScheduler
 import:
+- package: speter.net/go/exp/math/dec/inf
+  repo: git@github.com:go-inf/inf.git
 - package: github.com/docker/docker
   version: 1.9.0
   subpackage:

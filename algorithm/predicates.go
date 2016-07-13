@@ -5,6 +5,7 @@ import (
 
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/labels"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/algorithm"
 	pluginPred "k8s.io/kubernetes/plugin/pkg/scheduler/algorithm/predicates"
 	"k8s.io/kubernetes/plugin/pkg/scheduler/factory"
@@ -25,6 +26,8 @@ func init() {
 			return NewNodeOutOfDiskPredicate(args.NodeInfo)
 		},
 	)
+
+	factory.RegisterFitPredicate("DeisUniqueApp", UniqueDeisApp)
 }
 
 //ResourceOverCommit used to determine if scheduling pods would over commit a node
@@ -120,6 +123,23 @@ func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, node string, cacheI
 		if totalMem > info.Status.Capacity.Memory().Value() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on Memory", pod.Name, info.Name)
 			return false, nil //TODO return newOverCommitError("Memory") when InsufficentResources can be modified
+		}
+	}
+
+	return true, nil
+}
+
+//UniqueDeisApp ensures that deis apps are unique by version on each node
+func UniqueDeisApp(pod *api.Pod, node string, cacheInfo *schedulercache.NodeInfo) (bool, error) {
+	if value, exists := pod.GetLabels()["heritage"]; !exists || value != "deis" {
+		return true, nil //Pod is not from deis. Move along
+	}
+
+	labelSelector := labels.SelectorFromSet(pod.Labels)
+
+	for _, p := range cacheInfo.Pods() {
+		if labelSelector.Matches(labels.Set(p.Labels)) {
+			return false, nil
 		}
 	}
 

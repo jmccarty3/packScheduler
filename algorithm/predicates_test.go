@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	NodeDiskFull string = "DiskFull"
-	NodeDiskFine string = "DiskFine"
+	NodeDiskFull    string = "DiskFull"
+	NodeDiskFine    string = "DiskFine"
+	NodeDeisApps    string = "DeisApps"
+	NodeNonDeisApps string = "NoDeisApps"
 )
 
 type testNodeInfo struct {
@@ -45,12 +47,9 @@ func (i *testNodeInfo) GetNodeInfo(id string) (*api.Node, error) {
 	return nil, fmt.Errorf("Could not find node: %s", id)
 }
 
-func newTestNodeInfo() predicates.NodeInfo {
+func newTestNodeInfo(nodes []*api.Node) predicates.NodeInfo {
 	return &testNodeInfo{
-		nodes: []*api.Node{
-			createDiskNode(NodeDiskFull, api.ConditionTrue),
-			createDiskNode(NodeDiskFine, api.ConditionFalse),
-		},
+		nodes: nodes,
 	}
 }
 
@@ -68,7 +67,10 @@ func TestNodeDisk(t *testing.T) {
 			expected: false,
 		},
 	}
-	pred := NewNodeOutOfDiskPredicate(newTestNodeInfo())
+	pred := NewNodeOutOfDiskPredicate(newTestNodeInfo([]*api.Node{
+		createDiskNode(NodeDiskFull, api.ConditionTrue),
+		createDiskNode(NodeDiskFine, api.ConditionFalse),
+	}))
 
 	for _, test := range tests {
 		actual, err := pred(&api.Pod{}, test.name, schedulercache.NewNodeInfo())
@@ -78,6 +80,64 @@ func TestNodeDisk(t *testing.T) {
 
 		if actual != test.expected {
 			t.Errorf("Expected: %t, Got: %t", test.expected, actual)
+		}
+	}
+}
+
+func createDeisPod(version string) *api.Pod {
+	return &api.Pod{
+		ObjectMeta: api.ObjectMeta{
+			Labels: map[string]string{
+				"app":      "testApp",
+				"heritage": "deis",
+				"version":  version,
+			},
+		},
+	}
+}
+
+func TestDeisPredicate(t *testing.T) {
+	tests := []struct {
+		testName string
+		deisPod  *api.Pod
+		cache    *schedulercache.NodeInfo
+		expected bool
+	}{
+		{
+			testName: "NoDeisApps",
+			deisPod:  createDeisPod("v1"),
+			cache:    schedulercache.NewNodeInfo(&api.Pod{}),
+			expected: true,
+		},
+		{
+			testName: "SameVersion",
+			deisPod:  createDeisPod("v1"),
+			cache:    schedulercache.NewNodeInfo(createDeisPod("v1")),
+			expected: false,
+		},
+		{
+			testName: "DifferentVersion",
+			deisPod:  createDeisPod("v2"),
+			cache:    schedulercache.NewNodeInfo(createDeisPod("v1")),
+			expected: true,
+		},
+		{
+			testName: "EmptyPod",
+			deisPod:  &api.Pod{},
+			cache:    schedulercache.NewNodeInfo(createDeisPod("v1")),
+			expected: true,
+		},
+	}
+
+	for _, test := range tests {
+		actual, err := UniqueDeisApp(test.deisPod, "Node", test.cache)
+
+		if err != nil {
+			t.Errorf("Test %s had error %v", test.testName, err)
+		}
+
+		if actual != test.expected {
+			t.Errorf("Test %s. Expected: %v Actual: %v", test.testName, test.expected, actual)
 		}
 	}
 }
