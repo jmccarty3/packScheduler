@@ -15,12 +15,12 @@ dependencies:
   - ln -fs $HOME/$CIRCLE_PROJECT_REPONAME $HOME/.go_project/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME
   - |
     echo 'export GOPATH=$HOME/.go_project:$GOPATH' >> ~/.circlerc
-  - cd $HOME/.go_project/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME && ./glide update -v && go build
+  - cd $HOME/.go_project/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME && glide update -v && go build
   - docker build -t jmccarty3/packscheduler .
 
 test:
   override:
-    - cd $HOME/.go_project/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME && go test -v -race $(./glide novendor)
+    - cd $HOME/.go_project/src/github.com/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME && go test -v -race $(glide novendor)
     - docker run jmccarty3/packscheduler --version
 
 deployment:
