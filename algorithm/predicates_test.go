@@ -55,25 +55,23 @@ func newTestNodeInfo(nodes []*api.Node) predicates.NodeInfo {
 
 func TestNodeDisk(t *testing.T) {
 	tests := []struct {
-		name     string
+		node     *api.Node
 		expected bool
 	}{
 		{
-			name:     NodeDiskFine,
+			node:     createDiskNode(NodeDiskFine, api.ConditionFalse),
 			expected: true,
 		},
 		{
-			name:     NodeDiskFull,
+			node:     createDiskNode(NodeDiskFull, api.ConditionTrue),
 			expected: false,
 		},
 	}
-	pred := NewNodeOutOfDiskPredicate(newTestNodeInfo([]*api.Node{
-		createDiskNode(NodeDiskFull, api.ConditionTrue),
-		createDiskNode(NodeDiskFine, api.ConditionFalse),
-	}))
 
 	for _, test := range tests {
-		actual, err := pred(&api.Pod{}, test.name, schedulercache.NewNodeInfo())
+		info := schedulercache.NewNodeInfo()
+		info.SetNode(test.node)
+		actual, _, err := NodeOutOfDisk(&api.Pod{}, nil, info)
 		if err != nil {
 			t.Error("Error from predicate: ", err)
 		}
@@ -130,7 +128,7 @@ func TestDeisPredicate(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		actual, err := UniqueDeisApp(test.deisPod, "Node", test.cache)
+		actual, _, err := UniqueDeisApp(test.deisPod, "Node", test.cache)
 
 		if err != nil {
 			t.Errorf("Test %s had error %v", test.testName, err)

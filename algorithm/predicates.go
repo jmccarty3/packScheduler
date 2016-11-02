@@ -1,8 +1,6 @@
 package algorithm
 
 import (
-	"fmt"
-
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
@@ -12,65 +10,39 @@ import (
 	"k8s.io/kubernetes/plugin/pkg/scheduler/schedulercache"
 )
 
+const (
+	nodeOutOfDiskPred     = "NodeOutOfDisk"
+	podOverCommitNodePred = "PodOverCommitNode"
+	deisUniqueAppPred     = "DeisUniqueApp"
+)
+
+var (
+	nodeOutOfDiskPredError     = newPredicateFailure(nodeOutOfDiskPred)
+	podOverCommitNodePredError = newPredicateFailure(podOverCommitNodePred)
+	deisUniqueAppPredError     = newPredicateFailure(deisUniqueAppPred)
+)
+
+func newPredicateFailure(predicateName string) *pluginPred.PredicateFailureError {
+	return &pluginPred.PredicateFailureError{PredicateName: predicateName}
+}
+
 func init() {
-	factory.RegisterFitPredicateFactory(
-		"PodOverCommitNode",
-		func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-			return NewPodOverCommitPredicate(args.NodeInfo)
-		},
+	factory.RegisterFitPredicate(
+		podOverCommitNodePred,
+		PodOverCommitNode,
 	)
 
-	factory.RegisterFitPredicateFactory(
-		"NodeOutOfDisk",
-		func(args factory.PluginFactoryArgs) algorithm.FitPredicate {
-			return NewNodeOutOfDiskPredicate(args.NodeInfo)
-		},
+	factory.RegisterFitPredicate(
+		nodeOutOfDiskPred,
+		NodeOutOfDisk,
 	)
 
-	factory.RegisterFitPredicate("DeisUniqueApp", UniqueDeisApp)
-}
-
-//ResourceOverCommit used to determine if scheduling pods would over commit a node
-type ResourceOverCommit struct {
-	info pluginPred.NodeInfo
-}
-
-//NodeDisk used to determine if a node is reporting out of disk
-type NodeDisk struct {
-	info pluginPred.NodeInfo
-}
-
-//OverCommitError records what resource a node would be overcommited on
-type OverCommitError struct {
-	name string
-}
-
-func (e *OverCommitError) Error() string {
-	return fmt.Sprintf("Node would be overcommited on %s", e.name)
-}
-
-func newOverCommitError(name string) *OverCommitError {
-	return &OverCommitError{
-		name: name,
-	}
-}
-
-//NewNodeOutOfDiskPredicate crestes a new NodeOutOfDisk Predicate
-func NewNodeOutOfDiskPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate {
-	disk := &NodeDisk{
-		info: info,
-	}
-
-	return disk.NodeOutOfDisk
+	factory.RegisterFitPredicate(deisUniqueAppPred, UniqueDeisApp)
 }
 
 //NodeOutOfDisk determine if a node is reporting out of disk.
-func (d *NodeDisk) NodeOutOfDisk(pod *api.Pod, node string, cacheInfo *schedulercache.NodeInfo) (bool, error) {
-	info, err := d.info.GetNodeInfo(node)
-
-	if err != nil {
-		return false, err
-	}
+func NodeOutOfDisk(pod *api.Pod, meta interface{}, cacheInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	info := cacheInfo.Node()
 
 	for _, c := range info.Status.Conditions {
 		if c.Type != api.NodeOutOfDisk {
@@ -78,29 +50,16 @@ func (d *NodeDisk) NodeOutOfDisk(pod *api.Pod, node string, cacheInfo *scheduler
 		}
 
 		if c.Status == api.ConditionTrue {
-			return false, nil
+			return false, []algorithm.PredicateFailureReason{nodeOutOfDiskPredError}, nil
 		}
 	}
 
-	return true, nil
-}
-
-//NewPodOverCommitPredicate creates a new PodOverCommit predicate
-func NewPodOverCommitPredicate(info pluginPred.NodeInfo) algorithm.FitPredicate {
-	commit := &ResourceOverCommit{
-		info: info,
-	}
-
-	return commit.PodOverCommitNode
+	return true, nil, nil
 }
 
 //PodOverCommitNode determines if pod resource request/limits would cause overcommit for a node
-func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, node string, cacheInfo *schedulercache.NodeInfo) (bool, error) {
-	info, err := r.info.GetNodeInfo(node)
-
-	if err != nil {
-		return false, err
-	}
+func PodOverCommitNode(pod *api.Pod, meta interface{}, cacheInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
+	info := cacheInfo.Node()
 
 	pods := append(cacheInfo.Pods(), pod)
 	totalCPU := int64(0)
@@ -108,7 +67,7 @@ func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, node string, cacheI
 
 	if int64(len(pods)) > info.Status.Capacity.Pods().Value() {
 		glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would exceed Pod capacity", pod.Name, info.Name)
-		return false, nil
+		return false, []algorithm.PredicateFailureReason{podOverCommitNodePredError}, nil
 	}
 
 	for _, p := range pods {
@@ -118,30 +77,30 @@ func (r *ResourceOverCommit) PodOverCommitNode(pod *api.Pod, node string, cacheI
 
 		if totalCPU > info.Status.Capacity.Cpu().MilliValue() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on CPU", pod.Name, info.Name)
-			return false, nil //TODO return newOverCommitError("CPU") when InsufficentResources can be modified
+			return false, []algorithm.PredicateFailureReason{podOverCommitNodePredError}, nil //TODO return newOverCommitError("CPU") when InsufficentResources can be modified
 		}
 		if totalMem > info.Status.Capacity.Memory().Value() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on Memory", pod.Name, info.Name)
-			return false, nil //TODO return newOverCommitError("Memory") when InsufficentResources can be modified
+			return false, []algorithm.PredicateFailureReason{podOverCommitNodePredError}, nil //TODO return newOverCommitError("Memory") when InsufficentResources can be modified
 		}
 	}
 
-	return true, nil
+	return true, nil, nil
 }
 
 //UniqueDeisApp ensures that deis apps are unique by version on each node
-func UniqueDeisApp(pod *api.Pod, node string, cacheInfo *schedulercache.NodeInfo) (bool, error) {
+func UniqueDeisApp(pod *api.Pod, meta interface{}, cacheInfo *schedulercache.NodeInfo) (bool, []algorithm.PredicateFailureReason, error) {
 	if value, exists := pod.GetLabels()["heritage"]; !exists || value != "deis" {
-		return true, nil //Pod is not from deis. Move along
+		return true, nil, nil //Pod is not from deis. Move along
 	}
 
 	labelSelector := labels.SelectorFromSet(pod.Labels)
 
 	for _, p := range cacheInfo.Pods() {
 		if labelSelector.Matches(labels.Set(p.Labels)) {
-			return false, nil
+			return false, []algorithm.PredicateFailureReason{deisUniqueAppPredError}, nil
 		}
 	}
 
-	return true, nil
+	return true, nil, nil
 }

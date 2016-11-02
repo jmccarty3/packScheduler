@@ -9,8 +9,10 @@ import:
     - pkg/units
 - package: github.com/docker/libcontainer
 - package: github.com/docker/spdystream
+- package: k8s.io/client-go
+  version: d72c0e162789e1bbb33c33cfa26858a1375efe01 #Downstream deps use two different versions for client-go. There exists no current branch/tag with both the 1.4 and 1.5 folders
 - package: k8s.io/kubernetes
-  version: 1.2.0
+  version: 1.4.5
   subpackage:
     - .
     - plugin
