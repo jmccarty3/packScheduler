@@ -1,6 +1,8 @@
 package algorithm
 
 import (
+	"fmt"
+
 	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/labels"
@@ -17,9 +19,11 @@ const (
 )
 
 var (
-	nodeOutOfDiskPredError     = newPredicateFailure(nodeOutOfDiskPred)
-	podOverCommitNodePredError = newPredicateFailure(podOverCommitNodePred)
-	deisUniqueAppPredError     = newPredicateFailure(deisUniqueAppPred)
+	nodeOutOfDiskPredError        = newPredicateFailure(nodeOutOfDiskPred)
+	podOverCommitNodePredError    = newPredicateFailure(podOverCommitNodePred)
+	podOverCommitNodePredCPUError = newPredicateFailure(fmt.Sprintf("%s-CPU", podOverCommitNodePred))
+	podOverCommitNodePredMemError = newPredicateFailure(fmt.Sprintf("%s-Mem", podOverCommitNodePred))
+	deisUniqueAppPredError        = newPredicateFailure(deisUniqueAppPred)
 )
 
 func newPredicateFailure(predicateName string) *pluginPred.PredicateFailureError {
@@ -77,11 +81,11 @@ func PodOverCommitNode(pod *api.Pod, meta interface{}, cacheInfo *schedulercache
 
 		if totalCPU > info.Status.Capacity.Cpu().MilliValue() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on CPU", pod.Name, info.Name)
-			return false, []algorithm.PredicateFailureReason{podOverCommitNodePredError}, nil //TODO return newOverCommitError("CPU") when InsufficentResources can be modified
+			return false, []algorithm.PredicateFailureReason{podOverCommitNodePredCPUError}, nil //TODO return newOverCommitError("CPU") when InsufficentResources can be modified
 		}
 		if totalMem > info.Status.Capacity.Memory().Value() {
 			glog.V(10).Infof("Cannot schedule Pod %s, Because Node %v would be overcommited on Memory", pod.Name, info.Name)
-			return false, []algorithm.PredicateFailureReason{podOverCommitNodePredError}, nil //TODO return newOverCommitError("Memory") when InsufficentResources can be modified
+			return false, []algorithm.PredicateFailureReason{podOverCommitNodePredMemError}, nil //TODO return newOverCommitError("Memory") when InsufficentResources can be modified
 		}
 	}
 
