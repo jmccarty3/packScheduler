@@ -1,12 +1,13 @@
 package main
 
 import (
+	"flag"
 	"runtime"
 
 	_ "github.com/jmccarty3/packScheduler/algorithm"
 
 	"k8s.io/kubernetes/pkg/healthz"
-	"k8s.io/kubernetes/pkg/util/flag"
+	k8sFlag "k8s.io/kubernetes/pkg/util/flag"
 	"k8s.io/kubernetes/pkg/util/logs"
 	"k8s.io/kubernetes/pkg/version/verflag"
 	"k8s.io/kubernetes/plugin/cmd/kube-scheduler/app"
@@ -24,10 +25,12 @@ func main() {
 	s := options.NewSchedulerServer()
 	s.AddFlags(pflag.CommandLine)
 
-	flag.InitFlags()
+	k8sFlag.InitFlags()
 	logs.InitLogs()
 	defer logs.FlushLogs()
 
 	verflag.PrintAndExitIfRequested()
+	// Trick to avoid 'logging before flag.Parse' warning
+	flag.CommandLine.Parse([]string{})
 	app.Run(s)
 }
